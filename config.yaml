@@ -1,0 +1,137 @@
+# ─── Data paths ───────────────────────────────────────────────────────────────
+data:
+  scraped_dir:       "data/scraped_json"      # structured JSON, not raw txt
+  docs_dir:          "data/docs"
+  embeddings_dir:    "data/embeddings"
+  faiss_index_dir:   "data/faiss_index"
+  logs_dir:          "logs"
+
+# ─── Scraping ─────────────────────────────────────────────────────────────────
+scrape:
+  base_url: "https://diseases.medelement.com/?searched_data=diseases&q=&mq=&tq=&diseases_filter_type=list&diseases_content_type=4&section_medicine=0&category_mkb=0&parent_category_mkb=0"
+  request_timeout:   30
+  scroll_pause:      1.0
+  page_pause:        2.0
+  wait_timeout:      15
+  max_workers:       3
+
+  # HTML selectors for structured extraction (ordered by priority)
+  content_selectors:
+    - ".disease-content"
+    - ".content-area"
+    - "article"
+    - "main"
+
+  # Section headers to look for in the scraped content.
+  # Maps canonical section names → list of header text patterns (case-insensitive).
+  section_map:
+    definition:
+      - "определение"
+      - "описание"
+      - "введение"
+    etiology:
+      - "этиология"
+      - "причины"
+      - "факторы риска"
+    symptoms:
+      - "клиническая картина"
+      - "клинические проявления"
+      - "симптомы"
+      - "жалобы"
+      - "анамнез"
+      - "признаки"
+    diagnostics:
+      - "диагностика"
+      - "диагноз"
+      - "лабораторные исследования"
+      - "инструментальные исследования"
+      - "обследование"
+      - "дифференциальный диагноз"
+    treatment:
+      - "лечение"
+      - "терапия"
+      - "медикаментозное лечение"
+      - "немедикаментозное лечение"
+      - "хирургическое лечение"
+    prevention:
+      - "профилактика"
+      - "реабилитация"
+      - "прогноз"
+    classification:
+      - "классификация"
+      - "код по мкб"
+      - "мкб-10"
+      - "мкб"
+
+  # Lines containing these phrases are discarded during scraping
+  junk_phrases:
+    - "материальный ущерб"
+    - "использования данного сайта"
+    - "не несет ответственности"
+    - "данный сайт"
+    - "ущерб здоровью"
+    - "все права защищены"
+    - "copyright"
+    - "cookie"
+    - "политика конфиденциальности"
+    - "пользовательское соглашение"
+    - "medelement"
+    - "скачать приложение"
+    - "реклама"
+
+# ─── Chunking & Embedding ────────────────────────────────────────────────────
+embed:
+  # Multilingual model that actually understands Russian
+  model_name: "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+  batch_size: 64
+  chunk_size:    800
+  chunk_overlap: 120
+  min_chunk_len: 60
+
+# ─── FAISS Index ──────────────────────────────────────────────────────────────
+index:
+  factory_string: "Flat"
+
+# ─── Retrieval ────────────────────────────────────────────────────────────────
+retrieve:
+  top_k:               15       # first-stage candidates from FAISS
+  rerank_k:            5        # final results after reranking
+  cross_encoder_model: ""       # set e.g. "cross-encoder/ms-marco-MiniLM-L-6-v2" to enable
+
+# ─── LLM (Ollama) ────────────────────────────────────────────────────────────
+model:
+  ollama_url:    "http://127.0.0.1:11434"
+  default_model: "gemma2:2b"
+  allowed_models:
+    - "mistral"
+    - "deepseek"
+    - "llama3"
+    - "gemma2:2b"
+  max_tokens:    512
+  temperature:   0.1
+
+# ─── RAG orchestration ───────────────────────────────────────────────────────
+rag:
+  top_docs: 5
+  red_flags:
+    chest_pain:
+      - "боль в груди"
+      - "давит в груди"
+      - "сжимающая боль"
+    severe_breath:
+      - "сильная одышка"
+      - "не хватает воздуха"
+      - "задыхаюсь"
+    fainting:
+      - "обморок"
+      - "потерял сознание"
+      - "потеряла сознание"
+    stroke_signs:
+      - "онемение лица"
+      - "перекос лица"
+      - "не могу говорить"
+      - "нарушение речи"
+      - "слабость одной стороны"
+    worst_headache:
+      - "самая сильная головная боль"
+      - "резкая сильная головная боль"

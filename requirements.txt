@@ -1,0 +1,22 @@
+# Telegram
+aiogram>=3.0
+
+# RAG / ML
+faiss-cpu
+sentence-transformers
+numpy
+
+# LLM
+requests
+
+# Scraping
+selenium
+webdriver-manager
+
+# Document readers
+pypdf
+python-docx
+
+# Utils
+python-dotenv
+pyyaml

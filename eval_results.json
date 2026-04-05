@@ -1,0 +1,202 @@
+{
+  "summary": {
+    "retrieval_accuracy": 0.0,
+    "answer_relevance": 16.7,
+    "no_hallucination": 100.0,
+    "disclaimer_present": 100.0,
+    "red_flag_detection": 66.7,
+    "total_time_seconds": 1882.9
+  },
+  "results": [
+    {
+      "name": "Red flag — stroke symptoms",
+      "retrieval": true,
+      "relevance": true,
+      "hallucination_free": true,
+      "disclaimer": true,
+      "issues": [
+        "Red flag NOT detected",
+        "Emergency number 103 missing"
+      ],
+      "time": 126.3
+    },
+    {
+      "name": "Red flag — breathing emergency",
+      "retrieval": true,
+      "relevance": true,
+      "hallucination_free": true,
+      "disclaimer": true,
+      "issues": [],
+      "time": 0.0
+    },
+    {
+      "name": "Red flag — fainting",
+      "retrieval": true,
+      "relevance": true,
+      "hallucination_free": true,
+      "disclaimer": true,
+      "issues": [],
+      "time": 0.0
+    },
+    {
+      "name": "Acute bronchitis",
+      "retrieval": false,
+      "relevance": false,
+      "hallucination_free": true,
+      "disclaimer": true,
+      "issues": [
+        "Expected [бронхит, респираторн, грипп] not found in retrieval",
+        "Expected disease not mentioned in answer"
+      ],
+      "time": 140.0
+    },
+    {
+      "name": "Acute cholecystitis",
+      "retrieval": false,
+      "relevance": false,
+      "hallucination_free": true,
+      "disclaimer": true,
+      "issues": [
+        "Expected [холецистит] not found in retrieval",
+        "Expected disease not mentioned in answer"
+      ],
+      "time": 134.7
+    },
+    {
+      "name": "Osteoarthritis",
+      "retrieval": false,
+      "relevance": false,
+      "hallucination_free": true,
+      "disclaimer": true,
+      "issues": [
+        "Expected [остеоартроз, артроз] not found in retrieval",
+        "Expected disease not mentioned in answer"
+      ],
+      "time": 148.6
+    },
+    {
+      "name": "Chickenpox in children",
+      "retrieval": false,
+      "relevance": false,
+      "hallucination_free": true,
+      "disclaimer": true,
+      "issues": [
+        "Expected [ветрян, оспа] not found in retrieval",
+        "Expected disease not mentioned in answer"
+      ],
+      "time": 91.3
+    },
+    {
+      "name": "Acute appendicitis",
+      "retrieval": false,
+      "relevance": true,
+      "hallucination_free": true,
+      "disclaimer": true,
+      "issues": [
+        "Expected [аппендицит] not found in retrieval"
+      ],
+      "time": 82.7
+    },
+    {
+      "name": "Psoriasis",
+      "retrieval": false,
+      "relevance": false,
+      "hallucination_free": true,
+      "disclaimer": true,
+      "issues": [
+        "Expected [псориаз] not found in retrieval",
+        "Expected disease not mentioned in answer"
+      ],
+      "time": 71.3
+    },
+    {
+      "name": "Diabetes symptoms",
+      "retrieval": false,
+      "relevance": false,
+      "hallucination_free": true,
+      "disclaimer": true,
+      "issues": [
+        "Expected [диабет] not found in retrieval",
+        "Expected disease not mentioned in answer"
+      ],
+      "time": 89.9
+    },
+    {
+      "name": "Hypertension",
+      "retrieval": false,
+      "relevance": false,
+      "hallucination_free": true,
+      "disclaimer": true,
+      "issues": [
+        "Expected [гипертенз] not found in retrieval",
+        "Expected disease not mentioned in answer"
+      ],
+      "time": 150.1
+    },
+    {
+      "name": "Iron deficiency anemia",
+      "retrieval": false,
+      "relevance": false,
+      "hallucination_free": true,
+      "disclaimer": true,
+      "issues": [
+        "Expected [анемия, железодефицит] not found in retrieval",
+        "Expected disease not mentioned in answer"
+      ],
+      "time": 70.4
+    },
+    {
+      "name": "Acute pancreatitis",
+      "retrieval": false,
+      "relevance": false,
+      "hallucination_free": true,
+      "disclaimer": true,
+      "issues": [
+        "Expected [панкреатит] not found in retrieval",
+        "Expected disease not mentioned in answer"
+      ],
+      "time": 112.3
+    },
+    {
+      "name": "Bronchial asthma",
+      "retrieval": false,
+      "relevance": true,
+      "hallucination_free": true,
+      "disclaimer": true,
+      "issues": [
+        "Expected [астма] not found in retrieval"
+      ],
+      "time": 175.2
+    },
+    {
+      "name": "Pneumonia",
+      "retrieval": false,
+      "relevance": false,
+      "hallucination_free": true,
+      "disclaimer": true,
+      "issues": [
+        "Expected [пневмони] not found in retrieval",
+        "Expected disease not mentioned in answer"
+      ],
+      "time": 297.9
+    },
+    {
+      "name": "Vague query — stomach pain",
+      "retrieval": true,
+      "relevance": true,
+      "hallucination_free": true,
+      "disclaimer": true,
+      "issues": [],
+      "time": 129.3
+    },
+    {
+      "name": "Off-topic — weather question",
+      "retrieval": true,
+      "relevance": true,
+      "hallucination_free": true,
+      "disclaimer": true,
+      "issues": [],
+      "time": 62.9
+    }
+  ]
+}
