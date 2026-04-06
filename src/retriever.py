@@ -1,17 +1,14 @@
 # src/retriever.py
 """
-Two-stage retriever with section-aware boosting.
-
-Key improvements:
-  1. Boosts chunks from "symptoms" and "diagnostics" sections for
-     symptom-related queries (the most common user intent).
-  2. Groups results by disease so the LLM gets coherent context
-     instead of random fragments from 5 different diseases.
-  3. Returns rich metadata (disease name, section, URL) for citations.
-  4. Junk filtering is no longer needed here — it's done at scrape time.
+Smart retriever with:
+  1. Relevance threshold — rejects random/non-medical queries
+  2. Query intent detection — symptoms vs treatment vs disease info
+  3. Section-aware boosting per intent type
+  4. Diversity filtering — max 2 chunks per disease
 """
 
 import os
+import re
 import pickle
 import logging
 from collections import defaultdict
@@ -52,9 +49,40 @@ CE_MODEL   = cfg["retrieve"]["cross_encoder_model"]
 EMB_MODEL  = cfg["embed"]["model_name"]
 MIN_LEN    = cfg["embed"]["min_chunk_len"]
 
-# Sections that are most relevant when the user describes symptoms
-SYMPTOM_SECTIONS = {"symptoms", "diagnostics", "definition"}
-SECTION_BOOST    = 0.08   # cosine-distance bonus for relevant sections
+SECTION_BOOST = 0.08
+MIN_RELEVANCE_SCORE = 0.75   # below this, results are considered irrelevant
+
+
+# ── Query intent detection ────────────────────────────────────────────────────
+
+TREATMENT_PATTERNS = [
+    r"как\s+лечить", r"как\s+лечится", r"лечение\b", r"чем\s+лечить",
+    r"какие\s+лекарства", r"какие\s+препараты", r"что\s+принимать",
+    r"что\s+пить", r"терапия\b", r"помогает\s+от", r"средств[оа]\s+от",
+]
+
+INFO_PATTERNS = [
+    r"что\s+тако[ей]", r"расскажи\s+о", r"расскажите\s+о",
+    r"информаци[яю]\s+о", r"опиши\s", r"что\s+за\s+болезнь",
+    r"причины\s", r"профилактика\s", r"диагностика\s",
+]
+
+INTENT_SECTIONS = {
+    "symptoms":  {"symptoms", "diagnostics", "definition"},
+    "treatment": {"treatment", "prevention", "symptoms"},
+    "info":      {"definition", "classification", "etiology", "symptoms"},
+}
+
+
+def detect_intent(query: str) -> str:
+    q = query.lower().strip()
+    for pat in TREATMENT_PATTERNS:
+        if re.search(pat, q):
+            return "treatment"
+    for pat in INFO_PATTERNS:
+        if re.search(pat, q):
+            return "info"
+    return "symptoms"
 
 
 # ── Load index + models once at import time ───────────────────────────────────
@@ -68,6 +96,8 @@ with open(META_PATH, "rb") as f:
     metadata = pickle.load(f)
 logger.info(f"Loaded index: {len(metadata)} entries")
 
+ALL_DISEASES = {m.get("disease", "").lower() for m in metadata if m.get("disease")}
+
 logger.info(f"Loading embedder: {EMB_MODEL}")
 embedder = SentenceTransformer(EMB_MODEL)
 
@@ -76,25 +106,52 @@ if reranker:
     logger.info(f"Cross-encoder loaded: {CE_MODEL}")
 
 
+# ── Disease name matching ─────────────────────────────────────────────────────
+
+def _find_disease_in_query(query: str) -> str | None:
+    q = query.lower().strip()
+    for prefix in ["что такое ", "расскажи о ", "расскажите о ",
+                   "информация о ", "как лечить ", "как лечится ",
+                   "лечение ", "причины ", "профилактика ", "диагностика ",
+                   "что за болезнь "]:
+        if q.startswith(prefix):
+            q = q[len(prefix):].strip()
+            break
+
+    best_match = None
+    best_len = 0
+    for disease in ALL_DISEASES:
+        if disease in q or q in disease:
+            if len(disease) > best_len:
+                best_match = disease
+                best_len = len(disease)
+    return best_match
+
+
 # ── Core ──────────────────────────────────────────────────────────────────────
-
 def retrieve(query: str, top_k: int | None = None) -> list[dict]:
-    """
-    Returns the most relevant chunks for *query*.
-    Enforces diversity: max 2 chunks per disease so results span
-    multiple diseases instead of repeating one.
 
-    Each result dict has keys:
-      score, text, disease, section, source, url, chunk_id
-    """
+    real_words = [w for w in query.strip().split() if len(w) >= 3]
+    if len(real_words) < 1:
+        logger.info(f"Query rejected: no real words")
+        return []
+
     k = top_k or TOP_K
-    # Fetch extra candidates so we have enough after diversity filtering
+    intent = detect_intent(query)
+    boost_sections = INTENT_SECTIONS.get(intent, INTENT_SECTIONS["symptoms"])
+
+    logger.info(f"Query intent: {intent}")
+
+    disease_match = _find_disease_in_query(query)
+    if disease_match:
+        logger.info(f"Disease name detected: {disease_match}")
+
     fetch_k = min(k * 4, index.ntotal)
     qv = embedder.encode([query], normalize_embeddings=True)
     D, I = index.search(qv, fetch_k)
 
     raw_docs: list[dict] = []
-    seen_texts: set[str] = set()   # near-duplicate filter
+    seen_texts: set[str] = set()
 
     for dist, idx in zip(D[0], I[0]):
         if idx < 0:
@@ -104,42 +161,45 @@ def retrieve(query: str, top_k: int | None = None) -> list[dict]:
         if len(text.strip()) < MIN_LEN:
             continue
 
-        # Skip near-duplicates (same first 80 chars)
         text_key = text[:80].strip()
         if text_key in seen_texts:
             continue
         seen_texts.add(text_key)
 
-        # Inner Product score (higher = more similar)
-        # With normalized vectors, this equals cosine similarity (0 to 1)
         score = float(dist)
 
-        # Boost chunks from symptom-relevant sections
         section = entry.get("section", "general")
-        if section in SYMPTOM_SECTIONS:
+        if section in boost_sections:
             score += SECTION_BOOST
+
+        if disease_match and disease_match in entry.get("disease", "").lower():
+            score += 0.15
 
         raw_docs.append({"score": score, "text": text, **entry})
 
-    # Sort by (boosted) score descending
     raw_docs.sort(key=lambda d: d["score"], reverse=True)
 
-    # Diversity filter: max 2 chunks per disease
+    if raw_docs and raw_docs[0]["score"] < MIN_RELEVANCE_SCORE:
+        logger.info(f"Best score {raw_docs[0]['score']:.3f} below threshold")
+        return []
+
     MAX_PER_DISEASE = 2
+    MAX_FOR_MATCHED = 4 if disease_match else 2
+
     disease_count: dict[str, int] = {}
     docs: list[dict] = []
 
     for d in raw_docs:
         disease = d.get("disease", "unknown")
-        count   = disease_count.get(disease, 0)
-        if count >= MAX_PER_DISEASE:
+        count = disease_count.get(disease, 0)
+        max_allowed = MAX_FOR_MATCHED if (disease_match and disease_match in disease.lower()) else MAX_PER_DISEASE
+        if count >= max_allowed:
             continue
         disease_count[disease] = count + 1
         docs.append(d)
         if len(docs) >= k:
             break
 
-    # Optional cross-encoder reranking
     if reranker and docs:
         pairs  = [[query, d["text"]] for d in docs]
         scores = reranker.predict(pairs)
@@ -155,10 +215,6 @@ def retrieve(query: str, top_k: int | None = None) -> list[dict]:
 
 
 def retrieve_grouped(query: str, top_k: int | None = None) -> dict[str, list[dict]]:
-    """
-    Same as retrieve(), but groups results by disease name.
-    Useful for building per-disease context blocks in the prompt.
-    """
     docs = retrieve(query, top_k)
     grouped: dict[str, list[dict]] = defaultdict(list)
     for d in docs:
@@ -166,13 +222,12 @@ def retrieve_grouped(query: str, top_k: int | None = None) -> dict[str, list[dic
     return dict(grouped)
 
 
-# ── CLI test ──────────────────────────────────────────────────────────────────
-
 if __name__ == "__main__":
     q = input("Query: ")
+    intent = detect_intent(q)
+    print(f"Intent: {intent}")
     for i, d in enumerate(retrieve(q), 1):
         sec = d.get("section", "?")
         dis = d.get("disease", "?")
         print(f"{i}. [{d['score']:.3f}] {dis} / {sec}")
         print(f"   {d['text'][:120]}…\n")
-        

@@ -69,7 +69,7 @@ def generate_answer(prompt: str) -> str:
     }
 
     try:
-        resp = requests.post(url, json=payload, stream=True, timeout=60)
+        resp = requests.post(url, json=payload, stream=True, timeout=300)
         resp.raise_for_status()
     except requests.RequestException as e:
         logger.error(f"Ollama request failed: {e}")
